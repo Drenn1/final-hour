@@ -1,0 +1,3 @@
+[submodule "libgb"]
+	path = libgb
+	url = ../libgb/
