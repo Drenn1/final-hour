@@ -1,6 +1,9 @@
 loadGfx:
-	ld a,%00000111
-	ldh [R_LCDC],a
+	ld a,%11000111
+	ld [wLCDC],a
+
+	ld a,%01000000 ; LYC interrupt
+	ldh [R_STAT],a
 
 	ld hl,spriteGfx
 	ld de,$8000
@@ -12,9 +15,10 @@ loadGfx:
 	ld bc,_sizeof_tileGfx
 	call copyMemory
 
-	ld hl,mapData
-	ld de,$9800
-	ld bc,_sizeof_mapData
+	ld hl,textGfx
+	ld de,$8800
+	ld bc,$800
+	ld bc,_sizeof_textGfx
 	call copyMemory
 	ret
 

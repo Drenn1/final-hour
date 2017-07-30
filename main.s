@@ -4,6 +4,7 @@
 .include "include/constants.s"
 .include "include/wram.s"
 .include "include/hram.s"
+.include "include/macros.s"
 
 .include "interrupts.s"
 
@@ -11,7 +12,17 @@
 
 .ORG $0
 
-.rept $40
+; rst $00: aka rst_jumpTable
+	pop hl
+	add a
+	call addAToHL
+	ldi a,[hl]
+	ld h,[hl]
+	ld l,a
+	jp hl
+
+.ORG $10
+.rept $30
 	.db 0 ; Prevent sections from claiming this
 .endr
 
@@ -37,9 +48,21 @@ begin:
 	ld bc,10
 	call copyMemory
 
+	; Load map
+	ld hl,mapData
+	call loadMap
+
+	; Set palettes
+	ld a,%11100100
+	ldh [R_BGP],a
+	ld a,%00011111
+	ldh [R_OBP0],a ; Ally sprites
+	ld a,%00101111
+	ldh [R_OBP1],a ; Enemy sprites
+
 	; Re-enable screen + interrupts
 	call enableLcd
-	ld a,INT_VBLANK | INT_TIMER
+	ld a,INT_VBLANK | INT_TIMER | INT_LCD
 	ldh [R_IE],a
 	ei
 
@@ -49,13 +72,6 @@ begin:
 ; 	ld a, 1
 ; 	ld hl, xpmp_song_tbl
 ; 	call xpmp_init
-
-	ld a,%11100100
-	ldh [R_BGP],a
-	ld a,%00011111
-	ldh [R_OBP0],a ; Ally sprites
-	ld a,%00101111
-	ldh [R_OBP1],a ; Enemy sprites
 
 	jp runGame
 
@@ -74,8 +90,12 @@ oamProcedure:
 .include "game.s"
 .include "objects.s"
 .include "sprites.s"
+.include "map.s"
+.include "bfs.s"
 
 .ENDS
+
+.include "text.s"
 
 
 .BANK 1 SLOT 1
@@ -88,6 +108,9 @@ tileGfx:
 
 spriteGfx:
 	.incbin "gfx/sprites.2bpp"
+
+textGfx:
+	.incbin "gfx/text.2bpp"
 
 mapData:
 	.incbin "gfx/screen.map"

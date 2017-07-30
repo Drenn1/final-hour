@@ -1,10 +1,20 @@
 .RAMSECTION "wram0" SLOT 2
 	wFrameCounter: db
+	wLCDC: db
+	wWY: db
+	wWX: db
+
+	wTextOptionPositions:	dsb 4
+	wNumTextOptions:	db
+	wSelectedTextOption:	db
+
+	wTextSubstitutions:	dsw 8 ; These are either numbers, or pointers to text.
 
 	wCursorY: db
 	wCursorX: db
 	wLastCursorY: db
 	wLastCursorX: db
+	wDrawCursor: db ; nonzero if cursor should be drawn
 
 	; Top-left of camera
 	wCameraY: db
@@ -13,18 +23,38 @@
 	wCameraDestY: db
 	wCameraDestX: db
 
-	wSelectedObject: db
+	wSelectedObject: db ; Object being controller
 	wSelectedObjectMovementCounter: db ; Nonzero while selected object is moving
 
+	wSelectingObject: db ; Nonzero while in the "selectObject" function.
+	wTargetObject:    db ; Object being attacked by wSelectedObject
+
+	; Null-terminated list of objects (used ie. when attacking)
+	wObjectList:		dsb $20
+	wObjectListCount:	db
+	wObjectListIndex:	db ; Object currently selected from the list
+
+	wAttackAnimationState:	db
+	wAttackAnimationCounter: db
+
+	wMapLayout:		dsb 32*32 ; Copied to VRAM
 	; Bitset of tiles that the selected character can traverse
-	wTraversableTiles: dsb 32*32/8
+	wTraversibleTiles: dsb 16*16/8
+
+	wBfsBufferEntries:	db
 
 	wStack:		dsb $100
 	wStackTop:	.db
 .ENDS
 
-.RAMSECTION "oam" SLOT 2 ALIGN $100
+.RAMSECTION "aligned" SLOT 2 ALIGN $100
+	wBfsBuffer:	dsb $100
+
 	wOam:		dsb 40*4
+
+	; map used by window layer for textboxes
+	; Should be aligned to $20
+	wWindowMap: dsb 32*4
 .ENDS
 
 
@@ -41,8 +71,14 @@
 	speedY		dw
 	speedX		dw
 
-	wHP		db
-	wMoved		db
+	oamAddress	db
+	oamFlags	db ; ORed with the "base" oam flags
+	flicker		db ; Set when selected
+
+	hp		db
+	maxHP		db
+	morale		db
+	moved		db
 
 	name		dsb 6
 	class		db

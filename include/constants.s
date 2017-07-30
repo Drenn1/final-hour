@@ -4,4 +4,4 @@
 .define SCREEN_WIDTH 10
 .define SCREEN_HEIGHT 9
 
-.define MOVEMENT_FRAMES 40 ; # frames the movement animation lasts for
+.define MOVEMENT_FRAMES 32 ; # frames the movement animation lasts for
