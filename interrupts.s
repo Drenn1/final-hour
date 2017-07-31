@@ -20,17 +20,8 @@ timerInterrupt:
 	push bc
 	push de
 	push hl
-	ld a, INT_TIMER
-	ldh (<hInterruptType), a
-; 	ld hl, rnd
-; 	inc (hl)
-; 	ldh a, (R_SVBK)
-; 	push af
-; 	ld a, MUSIC_WRAM_BANK
-; 	ldh (R_SVBK), a
-; 	call xpmp_update
-; 	pop af
-; 	ldh (R_SVBK), a
+; 	ld a, INT_TIMER
+; 	ldh (<hInterruptType), a
 
 	pop hl
 	pop de
@@ -138,6 +129,8 @@ vblankInterrupt:
 +
 	call vblankUpdateWindowMap
 	call hOamProcedure
+
+	call xpmp_update
 
 	pop hl
 	pop de

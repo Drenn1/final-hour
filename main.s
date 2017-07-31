@@ -58,8 +58,7 @@ begin:
 	ld a,%00101111
 	ldh [R_OBP1],a ; Enemy sprites
 
-	; Re-enable screen + interrupts
-	call enableLcd
+	; Re-enable interrupts
 	ld a,INT_VBLANK | INT_TIMER | INT_LCD
 	ldh [R_IE],a
 	ei
@@ -67,11 +66,11 @@ begin:
 	; Initialize audio
 ; 	ld a, %111
 ; 	ldh (R_TAC), a
-; 	ld a, 1
-; 	ld hl, xpmp_song_tbl
-; 	call xpmp_init
+	ld a, 1
+	ld hl, xpmp_song_tbl
+	call xpmp_init
 
-	jp runGame
+	jp showTitlescreen
 
 
 ; Procedure copied to hram
@@ -91,6 +90,8 @@ oamProcedure:
 .include "bfs.s"
 .include "ai.s"
 .include "party.s"
+.include "titlescreen.s"
+.include "music.s"
 
 .ENDS
 
@@ -107,9 +108,12 @@ tileGfx:
 	.incbin "gfx/tiles.2bpp"
 
 spriteGfx:
-	.incbin "gfx/sprites.2bpp"
+	.incbin "gfx/sprites.2bpp" READ $400
 
 textGfx:
-	.incbin "gfx/text.2bpp"
+	.incbin "gfx/text.2bpp" READ $400
+
+titlescreenGfx:
+	.incbin "gfx/titlescreen.2bpp"
 
 .ENDS
