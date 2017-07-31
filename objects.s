@@ -12,6 +12,12 @@ trySelectObject:
 	call findObjectAtPosition
 	jr nz,@fail
 
+	; Object must be on player's side
+	ld e,Object.side
+	ld a,[de]
+	or a
+	jr nz,@fail
+
 	; Object is on tile. Check if moved already
 	ld l,Object.moved
 	ld a,[hl]
@@ -32,6 +38,36 @@ trySelectObject:
 	or 1
 	ret
 	
+killAllEnemies:
+; =======================================================================================
+; For testing.
+; =======================================================================================
+	ld d,FIRST_OBJECT_INDEX
+--
+	ld e,Object.enabled
+	ld a,[de]
+	or a
+	jr z,@next
+	ld e,Object.side
+	ld a,[de]
+	or a
+	jr z,@next
+	call objectDelete
+@next
+	call getNextObject
+	jr c,--
+	ret
+
+deleteAllObjects:
+; =======================================================================================
+; =======================================================================================
+	ld d,FIRST_OBJECT_INDEX
+--
+	call objectDelete
+@next
+	call getNextObject
+	jr c,--
+	ret
 
 deselectObject:
 ; =======================================================================================
@@ -147,7 +183,6 @@ objectPrintStats:
 
 	ld e,Object.morale
 	ld a,[de]
-	call hexToBcd
 	ld [hl],a
 	inc hl
 	inc hl
@@ -315,6 +350,7 @@ getNextObject:
 	ret
 
 objectCenterCamera:
+	push bc
 	push hl
 
 	ld hl,wCursorY
@@ -342,6 +378,7 @@ objectCenterCamera:
 ; 	ld [hl],c
 
 	pop hl
+	pop bc
 	ret
 
 resetAllObjectMovement:
@@ -355,6 +392,20 @@ resetAllObjectMovement:
 	ld [de],a
 	call getNextObject
 	jr c,--
+	ret
+
+setAllObjectsMoved:
+; =======================================================================================
+; Used to trigger end of turn instantly.
+; =======================================================================================
+	ld d,FIRST_OBJECT_INDEX
+	ld e,Object.moved
+--
+	ld a,1
+	ld [de],a
+	call getNextObject
+	jr c,--
+	ret
 	ret
 
 checkAllPlayerObjectsMoved:

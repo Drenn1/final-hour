@@ -42,28 +42,39 @@ loadParty:
 partyData:
 	.db C_KING
 	.db 0 ; morale
-	.db $30 ; health
+	.db $40 ; health
 	.asc "Mathias" 0
 
 	.db C_HORSEMAN
-	.db 1 ; morale
-	.db $25 ; health
-	.asc "Ralph" 0
-
-	.db C_SOLDIER
 	.db 3 ; morale
-	.db $15 ; health
-	.asc "Joffrey" 0
+	.db $35 ; health
+	.asc "Lin" 0
 
 	.db C_SOLDIER
 	.db 4 ; morale
-	.db $20 ; health
+	.db $35 ; health
+	.asc "Joffrey" 0
+
+	.db C_SOLDIER
+	.db 3 ; morale
+	.db $30 ; health
 	.asc "Jean" 0
 
 	.db C_HORSEMAN
-	.db 5 ; morale
-	.db $25 ; health
-	.asc "Lin" 0
+	.db 2 ; morale
+	.db $40 ; health
+	.asc "Ralph" 0
+
+	.db C_SOLDIER
+	.db 1 ; morale
+	.db $30 ; health
+	.asc "Lou" 0
+
+	.db C_SOLDIER
+	.db 1 ; morale
+	.db $20 ; health
+	.asc "Lee" 0
+
 	.db 0
 
 
@@ -75,6 +86,17 @@ objectGetClassName:
 
 	ld e,Object.class
 	ld a,[de]
+	cp C_KING
+	jr nz,+
+	ld e,Object.side
+	ld a,[de]
+	or a
+	jr z,+
+	ld bc,commanderText
+	jr @ret
++
+	ld e,Object.class
+	ld a,[de]
 	ld hl,classNameTable
 	add a
 	call addAToHL
@@ -82,6 +104,7 @@ objectGetClassName:
 	ld b,[hl]
 	ld c,a
 
+@ret
 	pop hl
 	ret
 
@@ -100,6 +123,9 @@ horseText:
 	.asc "Horseman" 0
 knightText:
 	.asc "Knight" 0
+
+commanderText:
+	.asc "Leader" 0
 
 
 objectGetMovement

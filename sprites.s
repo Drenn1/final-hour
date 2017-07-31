@@ -263,21 +263,6 @@ drawObjects:
 	or a
 	jr z,@next
 
-	; Update the animation
-	ld hl,wObjectAnimationCounter
-	ld a,[hl]
-	or a
-	jr nz,++
-	; Next frame
-	ld [hl],170
-	dec hl ; wObjectAnimationFrame
-	ld a,1
-	xor [hl]
-	ld [hl],a
-	inc hl
-++
-	dec [hl]
-
 	; Check if this row is overloaded with sprites
 	ld e,Object.tileY
 	ld a,[de]

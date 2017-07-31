@@ -15,6 +15,12 @@ playerPhase:
 	call objectCenterCamera
 	call resetAllObjectMovement
 
+	call checkAllEnemiesDead
+	jr nz,+
+	ld a,[wCurrentMap] ; Load next map
+	inc a
+	jp loadMap
++
 	ld de,playerPhaseText
 	ld a,1
 	call printText
@@ -48,10 +54,13 @@ playerPhaseLoop:
 	jp loadMap
 +
 	call checkAllPlayerObjectsMoved ; Check if enemy phase is next
-	jr z,playerPhaseLoop
-	jp enemyPhase
+	jp nz,enemyPhase
+	jr playerPhaseLoop
 
 @updateInput
+	call checkAllPlayerObjectsMoved ; Check if enemy phase is next
+	jp nz,enemyPhase
+
 	call updateInput
 	jr playerPhaseLoop
 
@@ -319,8 +328,15 @@ doAttack:
 	ret
 
 @killed:
+	; If the king was killed, game over
+	push de
+	ldde FIRST_OBJECT_INDEX, Object.enabled
+	ld a,[de]
+	or a
+	pop de
+	jp z,gameOver
 	ld a,1
-	call objectAddMorale
+	call objectAddMorale ; Add morale to killer
 	jr @ret
 
 
@@ -399,20 +415,115 @@ doAttack:
 
 	call waitForVblank
 
-	pop bc
-	pop de
-	ld h,d
-	ld d,b
-	call objectDelete
-	ld d,h
-
 	xor a
 	ldh [<hOamFlicker],a
+
+	pop bc
+	pop de
+	push bc
+	push de
+	ld h,d
+	ld d,b
+
+	; If killee was in squad (and not the king), dec squad morale
+	ld e,Object.side
+	ld a,[de]
+	or a
+	jr nz,+
+	ld e,Object.class
+	ld a,[de]
+	cp C_KING
+	jr z,+
+
+	push hl ; Copy name into temporary buffer (since he's being delete)
+	push de
+	ld l,Object.name
+	ld h,d
+	ld de,wNameBuffer
+	ld bc,8
+	call copyMemory
+
+	pop de
+	call objectDelete
+
+	ld hl,wTextSubstitutions ; Notify player of death
+	ld [hl],<wNameBuffer
+	inc hl
+	ld [hl],>wNameBuffer
+	push de
+	ld de,objectDeadText
+	ld a,1
+	call printText
+	pop de
+
+	call decSquadMorale
+	pop hl
+	jr ++
++
+	call objectDelete
+++
+	pop de
+	pop bc
 
 	call updateBasics
 	call waitForVblank
 	ret
 
+objectDeadText:
+	.db 16
+	.asc "@ died." 0
+
+
+
+gameOver:
+; =======================================================================================
+; Game over, man
+; =======================================================================================
+	call fadeOut
+	call disableLcd
+	call clearBackground
+	call clearWindowMapInVram
+	call deleteAllObjects
+	ld a,%11100100
+	ldh [R_BGP],a
+	call enableLcd
+	call waitForVblank ; Re-synchronize before printing text
+	ld de,gameOverText
+	ld a,1
+	call printText
+	jp begin
+
+gameOverText:
+	.db $58
+	.asc " The king is dead." 1
+	.asc "Long live the king!" 1 1
+	.asc "     Game over" 0
+
+wonGame:
+; =======================================================================================
+; Yay
+; =======================================================================================
+	call fadeOut
+	call disableLcd
+	call clearBackground
+	call clearWindowMapInVram
+	call deleteAllObjects
+	ld a,%11100100
+	ldh [R_BGP],a
+	call enableLcd
+	call waitForVblank ; Re-synchronize before printing text
+	ld de,victoryText
+	ld a,1
+	call printText
+	jp begin
+	ret
+
+victoryText:
+	.db $58
+	.asc "Mathias has escaped" 1
+	.asc "from the usurpers." 1
+	.asc "For now, the battle" 1
+	.asc "      is won." 0
 
 animateAttack:
 ; =======================================================================================
@@ -554,6 +665,22 @@ updateBasics:
 	call drawObjects
 	call clearRemainingOam
 
+	; Update sprite animation counter
+	ld hl,wObjectAnimationCounter
+	ld a,[hl]
+	or a
+	jr nz,++
+	; Next frame
+	ld [hl],25
+	dec hl ; wObjectAnimationFrame
+	ld a,1
+	xor [hl]
+	ld [hl],a
+	inc hl
+++
+	dec [hl]
+
+
 	pop hl
 	pop de
 	pop bc
@@ -693,18 +820,30 @@ updateInput:
 ; =======================================================================================
 ; Handles input with cursor on the map, nothing selected.
 ; =======================================================================================
-	; Check if selected an object
 	ldh a,[<hButtonsJustPressed]
 	ld b,a
 
-	bit BTN_BIT_A,b
+	bit BTN_BIT_A,b ; Check if selected an object
 	jr z,+
 	call trySelectObject
 +
-	bit BTN_BIT_SELECT,b
+	bit BTN_BIT_SELECT,b ; Center on player character
 	jr z,+
 	ld d,$d0
 	call objectCenterCamera
++
+	bit BTN_BIT_START,b
+	jr z,+
+.ifdef DEBUG
+	call killAllEnemies
+.else
+	ld de,endTurnText
+	ld a,1
+	call printText
+	or a
+	jr z,+
+	call setAllObjectsMoved
+.endif
 +
 	ret
 

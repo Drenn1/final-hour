@@ -25,6 +25,15 @@ clearWindowMap:
 	ld a,$a8 ; space
 	jp fillMemory16
 
+clearWindowMapInVram:
+; =======================================================================================
+; Call this while lcd is off; this writes directly to vram.
+; =======================================================================================
+	ld hl,$9c00
+	ld b,$400/16
+	ld a,$a8 ; space
+	jp fillMemory16
+
 hideWindow:
 ; =======================================================================================
 ; Hides the text window
@@ -327,6 +336,7 @@ printText:
 	ld a,c
 	sub b
 	ret z
+	ret c
 	ld b,a
 	ld a,$a8 ; space
 --
@@ -376,4 +386,17 @@ moraleDecText:
 	.db 16
 	.asc "Morale -#" 0
 
+desertionText:
+	.db 16
+	.asc "@ deserted" 1
+	.asc "the group." 0
+
+decSquadMoraleText:
+	.db 16
+	.asc "Squad morale -1" 0
+
+endTurnText:
+	.db 16
+	.asc "End turn?" 1
+	.asc "% No   % Yes" 0
 .ENDS

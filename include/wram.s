@@ -18,6 +18,8 @@
 
 	wCurrentMap: db
 
+	wNameBuffer: dsb 8
+
 	; Top-left of camera
 	wCameraY: db
 	wCameraX: db

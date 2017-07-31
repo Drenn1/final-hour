@@ -26,6 +26,8 @@ MAP "'" = $ac
 ; $ad = cursor
 MAP "/" = $ae
 MAP "+" = $af
+MAP "?" = $b0
+MAP "," = $b1
 
 MAP "%" = $02 ; Marker for options
 MAP "#" = $03 ; Marker for number substitution

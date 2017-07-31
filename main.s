@@ -42,6 +42,8 @@ begin:
 	call clearMemory
 	call loadGfx
 
+	call clearWindowMapInVram
+
 	; Copy oam subroutine to hram
 	ld hl,oamProcedure
 	ld de,hOamProcedure
