@@ -96,6 +96,7 @@ convertPositionForOam:
 ; =======================================================================================
 ; Parameters: bc = position value (in room)
 ; Returns:    bc = position value (relative to camera, for oam)
+;             c if within the screen
 ; =======================================================================================
 	push hl
 	ld hl,wCameraY
@@ -110,6 +111,21 @@ convertPositionForOam:
 	add 8
 	ld c,a
 	pop hl
+
+	; Check in camera
+	ld a,b
+	or a
+	jr z,@out
+	cp 144+16
+	jr nc,@out
+	ld a,c
+	or a
+	jr z,@out
+	cp 160+8
+	jr nc,@out
+	ret
+@out:
+	xor a
 	ret
 
 drawCursor:
@@ -119,6 +135,8 @@ drawCursor:
 	ld a,[wDrawCursor]
 	or a
 	ret z
+
+	; TODO: have cursor flicker on sprite overload
 
 	; If selecting an object, we don't use the cursor position
 	ld a,[wSelectingObject]
@@ -152,17 +170,92 @@ drawCursor:
 	jp addToOam
 
 @cursorOam:
-	.db 4
+	.db 2
 	.db 0 0 0 $00
 	.db 0 8 0 $20
-	.db 0 0 0 $40
-	.db 0 8 0 $60
 
+
+calculateNumSpritesInRows:
+; =======================================================================================
+; Fills wNumObjectsInRows. Used to check whether to do sprite flickering.
+; TODO: optimize by only considering visible rows?
+; =======================================================================================
+	push bc
+	push de
+	push hl
+
+	ld bc,MAP_HEIGHT
+	ld hl,wNumObjectsInRows
+	xor a
+	call fillMemory
+
+	ld d,FIRST_OBJECT_INDEX
+--
+	ld e,Object.enabled
+	ld a,[de]
+	or a
+	jr z,@next
+
+	ld h,d
+	ld l,Object.yh
+	ld b,[hl]
+	ld l,Object.xh
+	ld c,[hl]
+	call convertPositionForOam
+	jr nc,@next
+
+	ld e,Object.tileY
+	ld a,[de]
+	ld hl,wNumObjectsInRows
+	call addAToHL
+	ld a,[hl]
+	inc [hl]
+	ld e,Object.flickerIndex
+	ld [de],a
+@next
+	call getNextObject
+	jr c,--
+
+	; Plus cursor
+	ld a,[wDrawCursor]
+	or a
+	jr z,+
+	ld a,[wCursorY]
+	ld hl,wNumObjectsInRows
+	call addAToHL
+	inc [hl]
++
+
+	ld b,0
+	ld hl,wObjectRowFlickerCounters
+--
+	ld a,[hl]
+	or a
+	jr nz,+
+	ld de,wNumObjectsInRows
+	ld a,b
+	call addAToDE
+	ld a,[de]
+	ld [hl],a
++
+	dec [hl]
+	inc hl
+	inc b
+	ld a,b
+	cp MAP_HEIGHT
+	jr c,--
++
+	pop hl
+	pop de
+	pop bc
+	ret
 
 drawObjects:
 ; =======================================================================================
 ; Draws all objects in memory at $d000-$de00.
 ; =======================================================================================
+	call calculateNumSpritesInRows
+
 	ld d, FIRST_OBJECT_INDEX
 --
 	ld e,Object.enabled
@@ -170,6 +263,43 @@ drawObjects:
 	or a
 	jr z,@next
 
+	; Update the animation
+	ld hl,wObjectAnimationCounter
+	ld a,[hl]
+	or a
+	jr nz,++
+	; Next frame
+	ld [hl],170
+	dec hl ; wObjectAnimationFrame
+	ld a,1
+	xor [hl]
+	ld [hl],a
+	inc hl
+++
+	dec [hl]
+
+	; Check if this row is overloaded with sprites
+	ld e,Object.tileY
+	ld a,[de]
+	ld b,a
+	ld hl,wNumObjectsInRows
+	call addAToHL
+	ld a,[hl]
+	cp 6
+	jr c,+
+	sub 5
+	ld c,a
+	ld hl,wObjectRowFlickerCounters
+	ld a,b
+	call addAToHL
+	ld e,Object.flickerIndex
+	ld a,[de]
+	ld b,a
+	ld a,[hl]
+	sub b
+	cp c
+	jr c,@next
++
 	; If selected, flicker the object
 	ld e,Object.flicker
 	ld a,[de]
@@ -180,7 +310,7 @@ drawObjects:
 	and b
 	jr z,@next
 +
-	ld e,Object.yh
+	ld e,Object.yh ; Calculate position
 	ld a,[de]
 	ld b,a
 	ld e,Object.xh
@@ -188,11 +318,32 @@ drawObjects:
 	ld c,a
 	call convertPositionForOam
 
-	ld e,Object.oamFlags
+	ld e,Object.class ; Lookup the OAM for this object
 	ld a,[de]
-	ld hl,classOam
+	add a
+	ld hl,classOamTable
+	call addAToHL
+	ldi a,[hl]
+	ld h,[hl]
+	ld l,a
+
+	ld e,Object.moved ; If moved, don't animate (use frame 0 always)
+	ld a,[de]
+	or a
+	jr nz,++
+	ld a,[wObjectAnimationFrame] ; Get the frame of animation
+	add a
+	call addAToHL
+++
+	ldi a,[hl]
+	ld h,[hl]
+	ld l,a
+
+	ld e,Object.oamFlags ; Get any modifications to oam flags
+	ld a,[de]
 	push de
-	call addToOamWithFlags
+	call addToOamWithFlags ; Draw it
+
 	ld a,e
 	inc a
 	sub 8
@@ -204,12 +355,51 @@ drawObjects:
 	inc d
 	ld a,d
 	cp LAST_OBJECT_INDEX+1
-	jr c,--
+	jp c,--
 	ret
 
-classOam:
+classOamTable:
+	.dw 0
+	.dw kingOam
+	.dw solderOam
+	.dw horseOam
+	.dw solderOam
+
+kingOam:
+	.dw @frame0
+	.dw @frame1
+
+@frame0:
+	.db 2
+	.db 0 0 $14 0
+	.db 0 8 $16 0
+@frame1:
+	.db 2
+	.db 0 0 $18 0
+	.db 0 8 $1a 0
+
+solderOam:
+	.dw @frame0
+	.dw @frame1
+
+@frame0:
 	.db 2
 	.db 0 0 $04 0
 	.db 0 8 $06 0
+@frame1:
+	.db 2
+	.db 0 0 $08 0
+	.db 0 8 $0a 0
 
+horseOam:
+	.dw @frame0
+	.dw @frame1
 
+@frame0:
+	.db 2
+	.db 0 0 $0c 0
+	.db 0 8 $0e 0
+@frame1:
+	.db 2
+	.db 0 0 $10 0
+	.db 0 8 $12 0

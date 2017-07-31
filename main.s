@@ -48,10 +48,6 @@ begin:
 	ld bc,10
 	call copyMemory
 
-	; Load map
-	ld hl,mapData
-	call loadMap
-
 	; Set palettes
 	ld a,%11100100
 	ldh [R_BGP],a
@@ -90,18 +86,20 @@ oamProcedure:
 .include "game.s"
 .include "objects.s"
 .include "sprites.s"
-.include "map.s"
 .include "bfs.s"
+.include "ai.s"
+.include "party.s"
 
 .ENDS
 
+.include "map.s"
 .include "text.s"
 
 
 .BANK 1 SLOT 1
 .ORGA $4000
 
-.SECTION bank1
+.SECTION gfx
 
 tileGfx:
 	.incbin "gfx/tiles.2bpp"
@@ -111,8 +109,5 @@ spriteGfx:
 
 textGfx:
 	.incbin "gfx/text.2bpp"
-
-mapData:
-	.incbin "gfx/screen.map"
 
 .ENDS

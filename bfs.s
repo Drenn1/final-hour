@@ -2,15 +2,19 @@ bfs:
 ; =======================================================================================
 ; Parameters: bc = starting position
 ;             a = depth to search
+;             [wSelectedObject] = object that's moving
+; Returns:    wTraversibleTiles = bitset of tiles that can be walked on
 ; =======================================================================================
+	push bc
+	push de
+	push hl
+
 	ldh [<hTmp1],a
-	xor a
-	ld [wBfsBufferEntries],a
 
 	push bc
 	ld hl,wTraversibleTiles
 	xor a
-	ld b,16*16/16
+	ld b,_sizeof_wTraversibleTiles/16
 	call fillMemory16
 
 	pop bc ; Starting Y/X position
@@ -40,9 +44,29 @@ bfs:
 	inc l
 	ldh [<hTmp2],a
 
-	call isTileTraversible
+	call isTileTraversible ; Check if it's solid
 	jr nc,@nextEntry
-	call isTraversibleTilesBitSet
+
+	push hl
+	push de
+	call findObjectAtPosition ; Check if there's already something there
+	jr nz,+
+
+	ld a,[wSelectedObject]
+	ld d,a
+	ld e,Object.side
+	ld l,e
+	ld a,[de]
+	cp [hl] ; It's ok if the object is on the same side
+	pop de
+	pop hl
+	jr nz,@nextEntry
+	jr ++
++
+	pop de
+	pop hl
+++
+	call isTraversibleTilesBitSet ; Check if we've already iterated on this
 	jr nz,@nextEntry
 
 	call setBitInTraversibleTiles
@@ -70,6 +94,9 @@ bfs:
 	jr @nextEntry
 
 @done
+	pop hl
+	pop de
+	pop bc
 	ret
 
 @addToBfs:
@@ -127,7 +154,7 @@ setBitInTraversibleTiles:
 
 isTraversibleTilesBitSet:
 ; =======================================================================================
-; Parameters: bc = position bit to set
+; Parameters: bc = position bit to check
 ; Returns:    zflag = set if that bit is not set
 ; =======================================================================================
 	push bc

@@ -16,6 +16,8 @@
 	wLastCursorX: db
 	wDrawCursor: db ; nonzero if cursor should be drawn
 
+	wCurrentMap: db
+
 	; Top-left of camera
 	wCameraY: db
 	wCameraX: db
@@ -34,6 +36,13 @@
 	wObjectListCount:	db
 	wObjectListIndex:	db ; Object currently selected from the list
 
+	wObjectAnimationFrame:		db
+	wObjectAnimationCounter:	db
+
+	; Used to handle object flickering when too many objects in one line
+	wNumObjectsInRows:		dsb MAP_HEIGHT
+	wObjectRowFlickerCounters:	dsb MAP_HEIGHT
+
 	wAttackAnimationState:	db
 	wAttackAnimationCounter: db
 
@@ -41,7 +50,12 @@
 	; Bitset of tiles that the selected character can traverse
 	wTraversibleTiles: dsb 16*16/8
 
-	wBfsBufferEntries:	db
+	wPhase:			db ; 0 for player phase, 1 for enemy phase
+
+	; These are used by ai routines
+	wBestTarget:		db
+	wBestTargetHP:		db
+	wBestTargetPosition:	dw ; Position of attacker, not target
 
 	wStack:		dsb $100
 	wStackTop:	.db
@@ -74,13 +88,18 @@
 	oamAddress	db
 	oamFlags	db ; ORed with the "base" oam flags
 	flicker		db ; Set when selected
+	animationFrame	db
+
+	flickerIndex	db ; Used when sprites are overloaded on line
 
 	hp		db
 	maxHP		db
 	morale		db
 	moved		db
 
-	name		dsb 6
+	aggressive	db ; For AI; if set, they charge
+
+	name		dsb 8
 	class		db
 	side		db ; 0 = player, 1 = enemy
 .ENDST

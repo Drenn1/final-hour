@@ -22,7 +22,7 @@ setWindowHeight:
 clearWindowMap:
 	ld hl,wWindowMap
 	ld b,32*4/16
-	ld a,$28 ; space
+	ld a,$a8 ; space
 	jp fillMemory16
 
 hideWindow:
@@ -84,7 +84,7 @@ printText:
 	ld a,l
 	sub <wWindowMap
 	ld [bc],a
-	ld a,$28 ; space
+	ld a,$a8 ; space
 	ldi [hl],a
 	jr --
 +
@@ -98,7 +98,11 @@ printText:
 	call @handleTextSubstitution
 	jr --
 +
-
+	cp 5 ; Check if signed number substitution
+	jr nz,+
+	call @handleSignedNumberSubstitution
+	jr --
++
 	ldi [hl],a
 	jr --
 
@@ -172,7 +176,7 @@ printText:
 	ld a,[wSelectedTextOption]
 	cp b
 	jr z,+
-	ld a,$28 ; space
+	ld a,$a8 ; space
 	jr ++
 +
 	ld a,$ad ; cursor
@@ -223,9 +227,52 @@ printText:
 	ld a,[hl] ; Print this number
 	pop hl
 	ld b,a
+
+	ld a,[de] ; Check if only one digit should be printed
+	cp 3
+	jr nz,+
+	ld a,b
 	and $f0
 	swap a
 	call @printDigit
++
+	ld a,b
+	and $0f
+	call @printDigit
+
+	ld a,[de]
+	cp 3
+	ret nz
+	inc de
+	ret
+
+@handleSignedNumberSubstitution:
+	ldh a,[<hTmp2] ; Get substitution index
+	inc a
+	ldh [<hTmp2],a
+	dec a
+
+	push hl
+	ld hl,wTextSubstitutions
+	add a
+	call addAToHL
+
+	ld a,[hl] ; Print this number
+	pop hl
+
+	bit 7,a
+	jr z,+
+	cpl
+	inc a
+	ld b,a
+	ld a,$a7 ; minus
+	jr ++
++
+	ld b,a
+	ld a,$af ; plus
+++
+	ldi [hl],a
+
 	ld a,b
 	and $0f
 	call @printDigit
@@ -281,7 +328,7 @@ printText:
 	sub b
 	ret z
 	ld b,a
-	ld a,$28 ; space
+	ld a,$a8 ; space
 --
 	ldi [hl],a
 	dec b
@@ -290,22 +337,43 @@ printText:
 	ret
 
 afterMoveText:
-	.db 8
+	.db 16
 	.asc "% Attack  % Wait" 0
 
 nobodyToAttackText:
-	.db 8
+	.db 16
 	.asc " Nobody to attack." 0
 
 statText:
 	.db 16
-	.asc "@@@@@@" 1
-	.asc "HP:##/##  MRL:##" 0
+	.asc "@@@@@@@   @@@@@@@@" 1
+	.asc "HP:##/##  MRL:$$" 0
+
+noMoraleStatText:
+	.db 16
+	.asc "@@@@@@@   @@@@@@@@" 1
+	.asc "HP:##/##  MRL:--" 0
 
 battleStatText:
-	.db 32
-	.asc "@@@@@@    @@@@@@" 1
+	.db 24
+	.asc "@@@@@@@   @@@@@@@" 1
 	.asc "HP:##/##  HP:##/##" 1
 	.asc "ATK:##    ATK:##" 0
+
+playerPhaseText:
+	.db 16
+	.asc "   Player phase" 0
+
+enemyPhaseText:
+	.db 16
+	.asc "    Enemy phase" 0
+
+moraleIncText:
+	.db 16
+	.asc "Morale +#" 0
+
+moraleDecText:
+	.db 16
+	.asc "Morale -#" 0
 
 .ENDS

@@ -25,8 +25,10 @@ MAP ">" = $ab
 MAP "'" = $ac
 ; $ad = cursor
 MAP "/" = $ae
+MAP "+" = $af
 
 MAP "%" = $02 ; Marker for options
 MAP "#" = $03 ; Marker for number substitution
 MAP "@" = $04 ; Marker for text substitution
+MAP "$" = $05 ; Marker for signed number substitution
 .ENDA

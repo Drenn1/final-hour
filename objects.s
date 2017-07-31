@@ -3,12 +3,14 @@ trySelectObject:
 ; Called when A is pressed.
 ; Returns: zflag set if object was selected; h = selected object
 ; =======================================================================================
+	push bc
+	push hl
 	ld hl,wCursorY
 	ld b,[hl]
 	inc hl
 	ld c,[hl]
 	call findObjectAtPosition
-	ret nz
+	jr nz,@fail
 
 	; Object is on tile. Check if moved already
 	ld l,Object.moved
@@ -20,9 +22,13 @@ trySelectObject:
 	ld d,h
 	call objectSetSelected
 	xor a
+	pop hl
+	pop bc
 	ret
 
 @fail:
+	pop hl
+	pop bc
 	or 1
 	ret
 	
@@ -113,15 +119,24 @@ objectPrintStats:
 ; =======================================================================================
 ; Print HP and Morale to the bottom bar.
 ; =======================================================================================
+	push bc
+	push hl
+
 	ld hl,wTextSubstitutions
-	ld a,Object.name; Get name for text substitution
+	ld a,Object.name ; Print name
 	ld [hl],a
 	inc hl
 	ld a,d
 	ld [hl],a
 	inc hl
 
-	ld e,Object.hp ; Get hp, maxHP for text substitution
+	call objectGetClassName ; Print class
+	ld [hl],c
+	inc hl
+	ld [hl],b
+	inc hl
+
+	ld e,Object.hp ; Print HP, maxHP
 	ld a,[de]
 	inc de
 	ldi [hl],a
@@ -137,11 +152,33 @@ objectPrintStats:
 	inc hl
 	inc hl
 
+	call objectHasMorale
 	push de
+	ld de,noMoraleStatText
+	jr nc,+
 	ld de,statText
++
 	xor a
 	call printText
 	pop de
+
+	pop hl
+	pop bc
+	ret
+
+objectHasMorale:
+; =======================================================================================
+; Returns: cflag set if object has morale
+; =======================================================================================
+	ld e,Object.side
+	ld a,[de]
+	or a
+	ret nz ; Enemies don't have it
+	ld e,Object.class
+	ld a,[de]
+	cp C_KING
+	ret z ; King doesn't have it
+	scf
 	ret
 
 objectPrintBattleStats:
@@ -181,11 +218,20 @@ objectPrintBattleStats:
 	ldi [hl],a
 	inc hl
 
+	push bc
 	call objectGetAttack
 	call hexToBcd
 	ld a,c
 	ldi [hl],a
 	inc hl
+
+	pop bc
+	push de
+	ld d,b
+	call objectGetAttack
+	call hexToBcd
+	ld a,c
+	pop de
 	ldi [hl],a
 	inc hl
 
@@ -257,32 +303,149 @@ objectGetAttackableObjects:
 	pop hl
 	ret
 
+getNextObject:
+; =======================================================================================
+; Parameters: d = current object
+; Returns:    d = next object
+;             cflag = unset if there are no more objects
+; =======================================================================================
+	inc d
+	ld a,d
+	cp LAST_OBJECT_INDEX+1
+	ret
+
+objectCenterCamera:
+	push hl
+
+	ld hl,wCursorY
+	ld b,[hl]
+	inc hl
+	ld c,[hl]
+	push bc
+
+	ld e,Object.tileX
+	ld a,[de]
+	ldd [hl],a
+	dec e
+	ld a,[de]
+	ld [hl],a
+
+	call checkMoveCameraUp
+	call checkMoveCameraRight
+	call checkMoveCameraDown
+	call checkMoveCameraLeft
+
+	pop bc
+; 	ld hl,wCursorY
+; 	ld [hl],b
+; 	inc hl
+; 	ld [hl],c
+
+	pop hl
+	ret
+
+resetAllObjectMovement:
+; =======================================================================================
+; Allow all objects to move again.
+; =======================================================================================
+	ld d,FIRST_OBJECT_INDEX
+	ld e,Object.moved
+--
+	xor a
+	ld [de],a
+	call getNextObject
+	jr c,--
+	ret
+
+checkAllPlayerObjectsMoved:
+; =======================================================================================
+; Returns: nz if all player objects moved
+; =======================================================================================
+	ld d,FIRST_OBJECT_INDEX
+--
+	ld e,Object.enabled
+	ld a,[de]
+	or a
+	jr z,@next
+	ld e,Object.side
+	ld a,[de]
+	or a
+	jr nz,@next
+	ld e,Object.moved
+	ld a,[de]
+	or a
+	ret z
+@next:
+	call getNextObject
+	jr c,--
+	or d ; nz
+	ret
+
+checkAllEnemiesDead:
+; =======================================================================================
+; Returns: z if all enemies dead
+; =======================================================================================
+	push de
+
+	ld d,FIRST_OBJECT_INDEX
+--
+	ld e,Object.enabled
+	ld a,[de]
+	or a
+	jr z,@next
+	ld e,Object.side
+	ld a,[de]
+	or a
+	jr nz,@notDead
+@next
+	call getNextObject
+	jr c,--
+	xor a
+	pop de
+	ret
+@notDead
+	or d
+	pop de
+	ret
+
 objectInit:
 ; =======================================================================================
 ; Initialize an object
 ; =======================================================================================
+	push bc
+	push hl
+
 	ld a,1
 	ld e,Object.enabled
 	ld [de],a
 
-	; Set stats
-	ld a,$20
-	ld e,Object.hp
-	ld [de],a
-	inc e
-	ld [de],a ; maxHP
-
-	; Set default name
+	; Set default name (enemies only)
 	ld e,Object.side
 	ld a,[de]
 	or a
-	ld hl,@defaultAllyName
-	jr z,+
+	jr z,++
 	ld hl,@defaultEnemyName
-+
 	ld e,Object.name
-	ld bc,6
+	ld bc,8
 	call copyMemory
+++
+
+	; Set palette
+	ld e,Object.side
+	ld a,[de]
+	or a
+	ld a,0
+	jr z,+
+	ld a,$10
++
+	ld e,Object.oamFlags
+	ld [de],a
+
+	; Align on tile (assume caller set this already)
+	call objectAlignPositionToTile
+
+	pop hl
+	pop bc
 	ret
 
 @defaultAllyName:
@@ -290,12 +453,62 @@ objectInit:
 @defaultEnemyName:
 	.asc "ENEMY" 0
 	
-objectGetMovement:
-	ld a,4
+objectAddMorale:
+; =======================================================================================
+; Parameters: a = value to add to morale
+; =======================================================================================
+	push bc
+	push hl
+
+	ld b,a
+	call objectHasMorale
+	jr nc,@ret
+
+	ld hl,wTextSubstitutions
+	ld [hl],b
+
+	push de
+	ld de,moraleIncText
+	call printText
+	pop de
+
+	ld e,Object.morale
+	ld a,[de]
+	add b
+	ld [de],a
+
+@ret
+	pop hl
+	pop bc
 	ret
 
-objectGetAttack:
-	ld a,10
+objectSubMorale:
+; =======================================================================================
+; Parameters: a = value to remove from morale
+; =======================================================================================
+	push bc
+	push hl
+
+	ld b,a
+	call objectHasMorale
+	jr nc,@ret
+
+	ld hl,wTextSubstitutions
+	ld [hl],b
+
+	push de
+	ld de,moraleDecText
+	call printText
+	pop de
+
+	ld e,Object.morale
+	ld a,[de]
+	sub b
+	ld [de],a
+
+@ret
+	pop hl
+	pop bc
 	ret
 
 objectTakeDamage:
@@ -336,10 +549,29 @@ objectDelete:
 	jr c,-
 	ret
 
+getFreeObjectSlot
+; =======================================================================================
+; Returns: d = object slot
+;          cflag = set on failure
+; =======================================================================================
+	ld d,FIRST_OBJECT_INDEX
+	ld e,Object.enabled
+@next
+	ld a,[de]
+	or a
+	ret z
+	call getNextObject
+	jr c,@next
+	scf
+	ret
+
 objectAlignPositionToTile:
 ; =======================================================================================
 ; Sets an object's x and y positions to match the tileY and tileX variables.
 ; =======================================================================================
+	push bc
+	push hl
+
 	ld h,d
 	ld l,Object.tileY
 	ldi a,[hl]
@@ -354,6 +586,9 @@ objectAlignPositionToTile:
 	ld [hl],b
 	dec l
 	ld [hl],0
+
+	pop hl
+	pop bc
 	ret
 
 objectSetSelected:

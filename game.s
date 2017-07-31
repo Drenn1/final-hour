@@ -2,65 +2,58 @@
 runGame:
 	ld a,1
 	ldh [<hUpdateWindowMap],a
+
+	call loadParty
+
+	; Load map
+	ld a,0
+	jp loadMap
+
+
+playerPhase:
+	ld d,$d0
+	call objectCenterCamera
+	call resetAllObjectMovement
+
+	ld de,playerPhaseText
+	ld a,1
+	call printText
+
+	ld a,1
 	ld [wDrawCursor],a
+	xor a
+	ld [wPhase],a
 
-	ld de,$d000
-	call objectInit
-	ld e,Object.tileY
-	ld a,1
-	ld [de],a
-	inc e
-	ld [de],a
-	call objectAlignPositionToTile
-
-	ld de,$d100
-	ld e,Object.side
-	ld a,1
-	ld [de],a
-	ld e,Object.oamFlags
-	ld a,$10
-	ld [de],a
-	ld e,Object.tileX
-	ld a,5
-	ld [de],a
-	call objectAlignPositionToTile
-	call objectInit
-
-	ld de,$d200
-	ld e,Object.side
-	ld a,1
-	ld [de],a
-	ld e,Object.oamFlags
-	ld a,$10
-	ld [de],a
-	ld e,Object.tileY
-	ld a,1
-	ld [de],a
-	ld e,Object.tileX
-	ld a,4
-	ld [de],a
-	call objectAlignPositionToTile
-	call objectInit
-
-mainLoop:
+playerPhaseLoop:
+	call updateBasics
 	call waitForVblank
 
 	ld hl,wSelectedObjectMovementCounter
 	ld a,[hl]
 	or a
-	jr z,++
+	jr z,@updateInput
 
 	; Selected object is moving. Input disabled
 	dec [hl]
-	jr nz,@doneInput
+	jr nz,playerPhaseLoop
 
+	; Object finished moving, now open menu, etc
 	call finishObjectMovement
-	jr mainLoop
-++
+
+	call checkAllEnemiesDead ; Check to load the next map
+	jr nz,+
+
+	ld a,[wCurrentMap]
+	inc a
+	jp loadMap
++
+	call checkAllPlayerObjectsMoved ; Check if enemy phase is next
+	jr z,playerPhaseLoop
+	jp enemyPhase
+
+@updateInput
 	call updateInput
-@doneInput
-	call updateBasics
-	jr mainLoop
+	jr playerPhaseLoop
 
 
 finishObjectMovement:
@@ -137,7 +130,7 @@ finishObjectMovement:
 	call deselectObject
 	ld e,Object.moved
 	ld a,1
-; 	ld [de],a
+	ld [de],a
 @ret:
 	pop bc
 	ret
@@ -154,6 +147,29 @@ finishObjectMovement:
 	ld d,h
 	jp objectAlignPositionToTile
 
+
+waitForCamera:
+	push de
+	push hl
+	ld hl,wCameraY
+	ld de,wCameraDestY
+--
+	call updateBasics
+	call waitForVblank
+	ld a,[de]
+	cp [hl]
+	jr nz,--
+	inc de
+	ld a,[de]
+	inc hl
+	cp [hl]
+	dec de
+	dec hl
+	jr nz,--
+
+	pop hl
+	pop de
+	ret
 
 selectObject:
 ; =======================================================================================
@@ -269,7 +285,7 @@ doAttack:
 	ld c,Object.enabled ; Return if enemy died
 	ld a,[bc]
 	or a
-	jr z,@end
+	jr z,@killed
 
 	; Defender attacks
 	ld e,d
@@ -278,10 +294,35 @@ doAttack:
 	call animateAttack
 	call @applyDamage
 
-@end
+	ld c,Object.enabled
+	ld a,[bc]
+	or a
+	jr z,@killed
+
+	; Both survived. Player object should lose morale
+	ld e,Object.side
+	ld a,[de]
+	or a
+	jr z,+
+	ld d,b
++
+	ld a,1
+	call objectSubMorale
+
+@ret
+	; Restore cursor if in player phase
+	ld a,[wPhase]
+	or a
+	ret nz
 	ld a,1
 	ld [wDrawCursor],a
 	ret
+
+@killed:
+	ld a,1
+	call objectAddMorale
+	jr @ret
+
 
 @applyDamage:
 ; =======================================================================================
@@ -320,7 +361,6 @@ doAttack:
 	ld b,3
 -
 	push bc
-	call updateBasics
 	call waitForVblank
 	pop bc
 	dec b
@@ -343,7 +383,6 @@ doAttack:
 	ld b,3
 -
 	push bc
-	call updateBasics
 	call waitForVblank
 	pop bc
 	dec b
@@ -358,7 +397,6 @@ doAttack:
 	or a
 	jr nz,@deathLoop2
 
-	call updateBasics
 	call waitForVblank
 
 	pop bc
@@ -494,6 +532,10 @@ updateBasics:
 ; This is part of the main loop, but sometimes code calls this outside of the main loop
 ; when they're holding it up somehow.
 ; =======================================================================================
+	push bc
+	push de
+	push hl
+
 	ld hl,wFrameCounter
 	inc [hl]
 
@@ -512,6 +554,9 @@ updateBasics:
 	call drawObjects
 	call clearRemainingOam
 
+	pop hl
+	pop de
+	pop bc
 	ret
 
 @updateCameraComponent:
@@ -656,6 +701,11 @@ updateInput:
 	jr z,+
 	call trySelectObject
 +
+	bit BTN_BIT_SELECT,b
+	jr z,+
+	ld d,$d0
+	call objectCenterCamera
++
 	ret
 
 @checkInputSomethingSelected:
@@ -673,21 +723,58 @@ updateInput:
 +
 	; Check A button to move to position
 	bit BTN_BIT_A,b
-	jr z,++
+	jr z,@ret
 
-	; Calculate speed needed to move to the position
 	ld a,[wSelectedObject]
-	ld h,a
+	ld d,a
+	ld a,[wCursorY] ; bc = cursor position
+	ld b,a
+	ld a,[wCursorX]
+	ld c,a
 
+	; Don't allow movement to there if an object is already present
+	call findObjectAtPosition
+	jr nz,@moveUnit
+	ld a,h
+	cp d ; It's fine if the object is itself
+	jr nz,@ret
+
+@moveUnit
+	call objectCalculateMovementSpeed
+
+	ld a,1 ; only 1 frame if speed was 0
+	jr z,+
+	ld a,MOVEMENT_FRAMES
++
+	ld [wSelectedObjectMovementCounter],a
+
+	; Disable flickering while moving
+	ld e,Object.flicker
+	xor a
+	ld [de],a
+
+@ret
+	ret
+
+objectCalculateMovementSpeed:
+; =======================================================================================
+; Sets an object's speed to move toward a position
+; Parameters: d = object
+;             bc = target position
+;             zflag = set if speed is 0 (both components)
+; =======================================================================================
+	push hl
+
+	ld h,d
 	ld e,Object.speedY
 	ld l,Object.tileY
-	ld a,[wCursorY]
-	call @@calcSpeedComponent
+	ld a,b
+	call @calcSpeedComponent
 
 	ld e,Object.speedX
 	ld l,Object.tileX
-	ld a,[wCursorX]
-	call @@calcSpeedComponent
+	ld a,c
+	call @calcSpeedComponent
 
 	ld l,Object.speedY ; Check if speed is 0
 	ldi a,[hl]
@@ -696,23 +783,15 @@ updateInput:
 	or [hl]
 	inc l
 	or [hl]
-	ld a,1
-	jr z,+
-	ld a,MOVEMENT_FRAMES
-+
-	ld [wSelectedObjectMovementCounter],a
 
-	; Disable flickering while moving
-	ld l,Object.flicker
-	ld [hl],0
-
-++
+	pop hl
 	ret
 
-@@calcSpeedComponent:
+@calcSpeedComponent:
 ; =======================================================================================
 ; Calculates the speed necessary to reach the target tile in the movement animation.
 ; =======================================================================================
+	push bc
 	sub [hl]
 	sla a
 	sla a
@@ -729,6 +808,7 @@ updateInput:
 	ld [hl],c
 	inc l
 	ld [hl],b
+	pop bc
 	ret
 
 updateLastCursorPos:
@@ -748,8 +828,10 @@ checkMoveCameraUp:
 	swap a
 	ld hl,wCameraDestY
 	sub [hl]
+	jr c,+
 	cp 1*16
 	ret nc
++
 	ld a,[wCursorY]
 	sub 1
 	jr nc,+
@@ -787,8 +869,10 @@ checkMoveCameraLeft:
 	swap a
 	ld hl,wCameraDestX
 	sub [hl]
+	jr c,+
 	cp 1*16
 	ret nc
++
 	ld a,[wCursorX]
 	sub 1
 	jr nc,+
