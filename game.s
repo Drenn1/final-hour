@@ -482,6 +482,8 @@ gameOver:
 	call clearBackground
 	call clearWindowMapInVram
 	call deleteAllObjects
+	xor a
+	ld [wDrawCursor],a
 	ld a,%11100100
 	ldh [R_BGP],a
 	call enableLcd
@@ -506,6 +508,8 @@ wonGame:
 	call clearBackground
 	call clearWindowMapInVram
 	call deleteAllObjects
+	xor a
+	ld [wDrawCursor],a
 	ld a,%11100100
 	ldh [R_BGP],a
 	call enableLcd
@@ -514,7 +518,6 @@ wonGame:
 	ld a,1
 	call printText
 	jp begin
-	ret
 
 victoryText:
 	.db $58
