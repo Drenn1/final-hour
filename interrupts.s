@@ -129,7 +129,6 @@ vblankInterrupt:
 +
 	call vblankUpdateWindowMap
 	call hOamProcedure
-
 	call xpmp_update
 
 	pop hl

@@ -220,8 +220,6 @@ checkDesertion:
 	jr nc,@next
 	ld e,Object.morale
 	ld a,[de]
-	or a
-	jr z,+
 	cp $80
 	jr c,@next
 +
@@ -377,7 +375,7 @@ map2PlayerObj:
 map2EnemyObj:
 	.db C_HORSEMAN	7, 14,$20
 	.db C_SOLDIER	5, 10,$20
-	.db C_SOLDIER	8, 7, $25
+	.db C_SOLDIER	8, 7, $20
 	.db C_HORSEMAN	11,10,$20
 	.db C_HORSEMAN	7, 4, $20
 

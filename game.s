@@ -404,7 +404,6 @@ doAttack:
 	dec b
 	jr nz,-
 
-
 	ldh a,[<hOamFlickerSize]
 	dec a
 	dec a
@@ -412,8 +411,6 @@ doAttack:
 
 	or a
 	jr nz,@deathLoop2
-
-	call waitForVblank
 
 	xor a
 	ldh [<hOamFlicker],a
@@ -460,6 +457,7 @@ doAttack:
 	pop hl
 	jr ++
 +
+
 	call objectDelete
 ++
 	pop de

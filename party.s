@@ -46,17 +46,17 @@ partyData:
 	.asc "Mathias" 0
 
 	.db C_HORSEMAN
-	.db 3 ; morale
+	.db 2 ; morale
 	.db $35 ; health
 	.asc "Lin" 0
 
 	.db C_SOLDIER
-	.db 4 ; morale
+	.db 3 ; morale
 	.db $35 ; health
 	.asc "Joffrey" 0
 
 	.db C_SOLDIER
-	.db 3 ; morale
+	.db 2 ; morale
 	.db $30 ; health
 	.asc "Jean" 0
 
@@ -66,7 +66,7 @@ partyData:
 	.asc "Ralph" 0
 
 	.db C_SOLDIER
-	.db 1 ; morale
+	.db 0 ; morale
 	.db $30 ; health
 	.asc "Lou" 0
 
