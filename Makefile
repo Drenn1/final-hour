@@ -2,7 +2,7 @@ CC = wla-gb
 CFLAGS = -x
 LD = wlalink
 LDFLAGS = -v -S
-TARGET = dare.gb
+TARGET = finalhour.gb
 XPMC ?= xpmc
 
 SONGS  = music/main.asm
