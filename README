@@ -1,0 +1,12 @@
+To build this, you'll need the wla-dx assembler from: https://github.com/vhelin/wla-dx
+
+The latest release is v9.6, but I used a relatively recent commit:
+https://github.com/vhelin/wla-dx/commit/01f7fd16a111ed2cbb81b4c07ed5e793bff5d6bd
+
+v9.6 may or may not be able to assemble this.
+
+Music was done with xpmck. To modify it you'll need "xpmc" in your path.
+http://jiggawatt.org/muzak/xpmck/
+
+Graphics were done with ppm, though this tool is abandoned...
+http://www.villehelin.com/ppm.html
